@@ -14,7 +14,7 @@ struct CascadeInput {
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let angular_sample_count_sqrt = u32(sqrt(f32(input.angular_sample_count)));
     for (var i = 0u; i < input.angular_sample_count; i++) {
-        let ray_radiance = cast_ray_in_direction(vec2f(id.xy) * input.distance_between_probes, f32(i) / f32(input.angular_sample_count) * (2.0 * PI) / f32(input.angular_sample_count), vec2f(0.0));
+        let ray_radiance = cast_ray_in_direction(vec2f(id.xy) * input.distance_between_probes, f32(i) / f32(input.angular_sample_count) * (2.0 * PI), vec2f(0.0));
         let pix_pos = vec2u(angular_sample_count_sqrt * id.xy) + vec2u(i % input.angular_sample_count, i / input.angular_sample_count);
         textureStore(output, pix_pos, ray_radiance);
     }

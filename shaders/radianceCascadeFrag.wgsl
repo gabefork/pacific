@@ -1,3 +1,6 @@
+@group(0) @binding(0) var cascade: texture_2d<f32>;
+@group(1) @binding(0) var sample: sampler;
+
 struct VertexOut {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>
@@ -19,5 +22,7 @@ struct Ray {
 
 @fragment
 fn main(vertex_output: VertexOut) -> @location(0) vec4f { 
-    return vec4f(vertex_output.tex_coords, 0.0, 1.0);
+    return textureSample(cascade, sample, vertex_output.tex_coords);
+    
+    // return vec4f(vertex_output.tex_coords, 0.0, 1.0);
 }
