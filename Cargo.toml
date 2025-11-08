@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+v4 = {git = "https://github.com/gamehunter101/v4-engine"}
+nalgebra = "0.33.2"
+wgpu = "24.0.1"
+tokio = { version = "1.45.1", features = ["full"] }
+bytemuck = "1.23.0"
