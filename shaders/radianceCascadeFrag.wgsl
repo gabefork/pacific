@@ -5,7 +5,7 @@ struct VertexOut {
 
 struct Cascade {
     angular_distance: f32,
-    angular_resolution: i32
+    angular_resolution: i32,
     x_pos: f32,
     y_pos: f32
 }
@@ -19,5 +19,5 @@ struct Ray {
 
 @fragment
 fn main(vertex_output: VertexOut) -> @location(0) vec4f { 
-    return out.clip_position;
+    return vec4f(vertex_output.tex_coords, 0.0, 1.0);
 }
