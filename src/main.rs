@@ -30,8 +30,8 @@ async fn main() {
     };
     let cascade_texture = Texture::create_texture(
         device,
-        HIGHEST_PROBE_CNT * 4,
-        HIGHEST_PROBE_CNT * 4,
+        HIGHEST_PROBE_CNT * 8,
+        HIGHEST_PROBE_CNT * 8,
         TextureFormat::Rgba8Unorm,
         Some(StorageTextureAccess::WriteOnly),
         false,
@@ -39,8 +39,8 @@ async fn main() {
     );
     let cascade_texture2 = Texture::create_texture(
         device,
-        HIGHEST_PROBE_CNT * 8,
-        HIGHEST_PROBE_CNT * 8,
+        HIGHEST_PROBE_CNT * 4,
+        HIGHEST_PROBE_CNT * 4,
         TextureFormat::Rgba8Unorm,
         Some(StorageTextureAccess::WriteOnly),
         false,
@@ -96,11 +96,11 @@ async fn main() {
                         )),
                         ShaderAttachment::Buffer(ShaderBufferAttachment::new(
                             device, bytemuck::cast_slice(&surface_objects), wgpu::BufferBindingType::Uniform, wgpu::ShaderStages::COMPUTE, wgpu::BufferUsages::empty()
-                        ))
+                        )),
                         // fix this later
-                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture2, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     ],
-                    output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                    output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture2, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     shader_path: "shaders/cascadeComputeCalculation.wgsl",
                     workgroup_counts: (HIGHEST_PROBE_CNT, HIGHEST_PROBE_CNT, 2),
                     ident: "cascade_compute",
