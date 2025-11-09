@@ -10,3 +10,4 @@ wgpu = "24.0.1"
 tokio = { version = "1.45.1", features = ["full"] }
 bytemuck = "1.23.0"
 image = "0.25.8"
+async-trait = "0.1.89"

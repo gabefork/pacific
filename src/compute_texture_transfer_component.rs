@@ -1,8 +1,7 @@
 use v4::{
     component,
     ecs::{
-        component::{ComponentDetails, ComponentId, ComponentSystem},
-        material::ShaderAttachment,
+        actions::ActionQueue, component::{ComponentDetails, ComponentId, ComponentSystem, UpdateParams}, material::ShaderAttachment
     },
 };
 
@@ -12,9 +11,16 @@ pub struct ComputeTextureTransferComponent {
     merge_id: ComponentId,
     ignore_material: ComponentId,
     texture_slot: usize,
+    // circle_pos: [f32; 2],
+    // dir: f32,
 }
 
+// #[async_trait::async_trait]
 impl ComponentSystem for ComputeTextureTransferComponent {
+    /* async fn update(update_params: UpdateParams) -> ActionQueue {
+        circle_pos = [circle_pos[0], circle_pos[1] + dir * 0.00001];
+    } */
+
     fn command_encoder_operations(
         &self,
         _device: &wgpu::Device,

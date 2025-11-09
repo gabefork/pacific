@@ -151,6 +151,29 @@ fn cast_ray(ray_origin: vec2<f32>, direction: vec2<f32>, max_distance: f32, excl
     return hit_object;
 }
 
+fn simple_cast_ray(ray_origin: vec2<f32>, direction: vec2<f32>, max_distance: f32, excluded_index: i32, step_count: f32) -> RaycastResult {
+    var total_dist = 0.;
+
+    var hit_object: RaycastResult;
+    hit_object.object_index = -1;
+    var iter_count = 0;
+    while (total_dist < max_distance && iter_count < 100) {
+        var ray_pos = ray_origin + direction * total_dist;
+
+        let closest_object_index = find_closest_object(ray_pos, excluded_index);
+        let closest_object = obj_arr[closest_object_index];
+        let distance = sphereSDF(ray_pos, closest_object.pos, closest_object.radius);
+        if (distance <= 0.0) {
+            hit_object.object_index = i32(closest_object_index);
+            hit_object.distance = total_dist;
+            break;
+        }
+        total_dist = total_dist + step_count;
+        iter_count++;
+    }
+    return hit_object;
+}
+
 fn get_light_attenuation(pos: vec2f, max_distance: f32, origin_obj_index: i32) -> vec4<f32>{
     // var accumulated_light = vec4f(0.0);
 
@@ -173,5 +196,15 @@ fn get_light_attenuation(pos: vec2f, max_distance: f32, origin_obj_index: i32) -
     } */
 
     // return accumulated_light;
+    /* let dir = obj_arr[0].pos - pos;
+    let ray = simple_cast_ray(pos + 0.1 * dir, dir, 1.0, -1, 0.01);
+    if ray.object_index == 0 {
+        return vec4f(1.0, 0.0, 0.0, 1.0);
+    } else if ray.object_index == 1 {
+        return vec4f(0.0, 1.0, 0.0, 1.0);
+    } else {
+        return vec4f(0.0, 0.0, 1.0, 1.0);
+    } */
+    // return vec4f(vec3f(ray.distance), 1.0);
     return vec4f(0.05 / distance(obj_arr[0].pos, pos)) * vec4f(obj_arr[0].color, 1.0) + (vec4f(obj_arr[2].data / distance(obj_arr[2].pos, pos)) * vec4f(obj_arr[2].color, 1.0));
 }

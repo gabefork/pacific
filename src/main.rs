@@ -88,7 +88,7 @@ async fn main() {
     );
 
     let merging_input = MergingInput{
-        current_level: 2,
+        current_level: 1,
         l0_probe_count: HIGHEST_PROBE_CNT,
         l0_angular_sample_count: ANGULAR_COUNT_SQRT * ANGULAR_COUNT_SQRT,
     };
@@ -96,7 +96,7 @@ async fn main() {
     let surface_objects = vec![
         SurfaceObject {pos: [0.2, 0.2], radius: 0.2, color: [1.0; 3], object_type: 1, data: 0.2},
         SurfaceObject {pos: [0.5, 0.75], radius: 0.3, color: [0.251, 0.529, 0.969], object_type: 0, data: 0.0},
-        SurfaceObject {pos: [1.0, 0.0], radius: 0.05, color: [0.8, 0.0, 0.0], object_type: 1, data: 0.2},
+        SurfaceObject {pos: [1.0, 0.0], radius: 0.05, color: [0.8, 0.0, 0.0], object_type: 1, data: 0.08},
     ];
 
     scene! {
