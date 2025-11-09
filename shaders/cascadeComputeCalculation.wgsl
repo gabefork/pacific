@@ -17,7 +17,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     for (var i = 0u; i < input.angular_sample_count; i++) {
         let ray_radiance = cast_ray_in_direction(
             world_pos + vec2f(1.0/32.0),
-            (f32(i) / f32(input.angular_sample_count) + 0.5) * (2.0 * PI),
+            (f32(i) / f32(input.angular_sample_count) + 1.0/8.0) * (2.0 * PI),
             vec2f(0.0, 1.0/32.0));
         let pix_pos = angular_sample_count_sqrt * vec2u(id.xy) + vec2u(i % angular_sample_count_sqrt, i / angular_sample_count_sqrt);
         textureStore(output, pix_pos, ray_radiance);
@@ -28,7 +28,7 @@ fn cast_ray_in_direction(position: vec2f, angle: f32, interval: vec2f) -> vec4f 
 
     // hard coded light at center
     let light_pos = vec2f(0.5);
-    let light_radius = 0.1;
+    let light_radius = 0.2;
     // let light_radiosity = 10.0;
     
     // Ray marching
@@ -47,6 +47,7 @@ fn cast_ray_in_direction(position: vec2f, angle: f32, interval: vec2f) -> vec4f 
             hit_color = vec4f(1.0, 1.0, 0.8, 1.0);
             break;
         }
+        total_dist = total_dist + step_size;
     }
 
     return hit_color;
