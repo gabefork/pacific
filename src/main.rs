@@ -1,4 +1,3 @@
-use image::ImageBuffer;
 use v4::{
     builtin_components::mesh_component::{MeshComponent, VertexDescriptor}, ecs::{
         compute::Compute,
@@ -48,12 +47,10 @@ async fn main() {
         wgpu::TextureUsages::COPY_SRC,
     );
 
-    // scale dimension with HIGHEST_PROBE_CNT ??
-    let mut buf = ImageBuffer::new(HIGHEST_PROBE_CNT * 4, HIGHEST_PROBE_CNT * 4);
-
-    for (_, _, pix) in buf.enumerate_pixels_mut() {
-        *pix = image::Rgba([255; 4]);
-    }
+    let surface_objects = vec![
+        SurfaceObject {pos: [0.2, 0.2], radius: 0.2, color: [1.0; 3], object_type: 1, data: 1.0},
+        SurfaceObject {pos: [0.5, 0.75], radius: 0.3, color: [0.251, 0.529, 0.969], object_type: 0, data: 0.0}
+    ];
 
     scene! {
         scene: main_scene,
@@ -97,6 +94,9 @@ async fn main() {
                         ShaderAttachment::Buffer(ShaderBufferAttachment::new(
                             device, bytemuck::cast_slice(&[cascade_input]), wgpu::BufferBindingType::Uniform, wgpu::ShaderStages::COMPUTE, wgpu::BufferUsages::empty()
                         )),
+                        ShaderAttachment::Buffer(ShaderBufferAttachment::new(
+                            device, bytemuck::cast_slice(&surface_objects), wgpu::BufferBindingType::Uniform, wgpu::ShaderStages::COMPUTE, wgpu::BufferUsages::empty()
+                        ))
                         // fix this later
                         ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture2, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     ],
@@ -142,4 +142,14 @@ struct CascadeInput {
     angular_sample_count: u32,
     // distance_between_probes: f32,
     // cascade_levels: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct SurfaceObject {
+    pos: [f32; 2],
+    radius: f32,
+    object_type: i32, // 0 for surface, 1 for light
+    color: [f32; 3],
+    data: f32,
 }
