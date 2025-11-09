@@ -21,22 +21,35 @@ async fn main() {
     let rendering_manager = engine.rendering_manager();
     let device = rendering_manager.device();
 
+    // actually square root of probe count
+    const HIGHEST_PROBE_CNT: u32 = 16;
     let cascade_input = CascadeInput {
-        linear_sample_count: 32,
-        angular_sample_count: 32,
-        distance_between_probes: 4.0,
+        l0_probe_count: HIGHEST_PROBE_CNT,
+        angular_sample_count: 64,
+        // distance_between_probes: 4.0,
+        // cascade_levels: 2,
     };
     let cascade_texture = Texture::create_texture(
         device,
-        32 * 4,
-        32 * 4,
+        HIGHEST_PROBE_CNT * 4,
+        HIGHEST_PROBE_CNT * 4,
+        TextureFormat::Rgba8Unorm,
+        Some(StorageTextureAccess::WriteOnly),
+        false,
+        wgpu::TextureUsages::COPY_SRC,
+    );
+    let cascade_texture2 = Texture::create_texture(
+        device,
+        HIGHEST_PROBE_CNT * 8,
+        HIGHEST_PROBE_CNT * 8,
         TextureFormat::Rgba8Unorm,
         Some(StorageTextureAccess::WriteOnly),
         false,
         wgpu::TextureUsages::COPY_SRC,
     );
 
-    let mut buf = ImageBuffer::new(32 * 4, 32 * 4);
+    // scale dimension with HIGHEST_PROBE_CNT ??
+    let mut buf = ImageBuffer::new(HIGHEST_PROBE_CNT * 4, HIGHEST_PROBE_CNT * 4);
 
     for (_, _, pix) in buf.enumerate_pixels_mut() {
         *pix = image::Rgba([255; 4]);
@@ -55,7 +68,7 @@ async fn main() {
                 },
                 attachments: [
                     Texture(
-                        texture: Texture::create_texture(device, 32 * 4, 32 * 4, TextureFormat::Rgba8Unorm, None, true, wgpu::TextureUsages::empty()),
+                        texture: Texture::create_texture(device, HIGHEST_PROBE_CNT * 4, HIGHEST_PROBE_CNT * 4, TextureFormat::Rgba8Unorm, None, true, wgpu::TextureUsages::empty()),
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     )
                 ],
@@ -83,11 +96,13 @@ async fn main() {
                     input: vec![
                         ShaderAttachment::Buffer(ShaderBufferAttachment::new(
                             device, bytemuck::cast_slice(&[cascade_input]), wgpu::BufferBindingType::Uniform, wgpu::ShaderStages::COMPUTE, wgpu::BufferUsages::empty()
-                        ))
+                        )),
+                        // fix this later
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture2, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     ],
                     output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     shader_path: "shaders/cascadeComputeCalculation.wgsl",
-                    workgroup_counts: (32, 32, 1),
+                    workgroup_counts: (HIGHEST_PROBE_CNT, HIGHEST_PROBE_CNT, 2),
                     ident: "cascade_compute",
                 )
             ],
@@ -123,7 +138,8 @@ impl VertexDescriptor for DisplayVert {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct CascadeInput {
-    linear_sample_count: u32,
+    l0_probe_count: u32,
     angular_sample_count: u32,
-    distance_between_probes: f32,
+    // distance_between_probes: f32,
+    // cascade_levels: u32,
 }
