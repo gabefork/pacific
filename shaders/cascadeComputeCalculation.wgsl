@@ -1,12 +1,13 @@
 @group(0) @binding(0) var<uniform> input: CascadeInput;
-@group(1) @binding(0) var<uniform> obj_arr: array<Object, NUM_OBJ>;
-@group(2) @binding(0) var output: texture_storage_2d<rgba8unorm, write>;
-@group(3) @binding(0) var output2: texture_storage_2d<rgba8unorm, write>;
+// number of outputs should be equal to id.z range ( = cascade levels)
+@group(1) @binding(0) var output: texture_storage_2d<rgba8unorm, write>;
+@group(2) @binding(0) var output2: texture_storage_2d<rgba8unorm, write>;
+@group(3) @binding(0) var output3: texture_storage_2d<rgba8unorm, write>;
 
 const PI = 3.14159265;
 const NUM_OBJ = 2;
 // constant instead of passing because lior did not implement arrays in wgsl yet
-const CASCSADE_LEVELS = 2u;
+// const CASCSADE_LEVELS = 3u;
 
 struct CascadeInput {
     l0_probe_count: u32,
@@ -36,8 +37,6 @@ fn sphereSDF(ray_position: vec2<f32>, pos: vec2<f32>, radius: f32) -> f32{
 @compute
 @workgroup_size(1)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-    // order in lowest cascade to highest cascade
-    // var output_level = array<texture_storage_2d<rgba8unorm, write>, CASCSADE_LEVELS>(output, output2);
     let cascade_level = id.z;
     let resolution = input.l0_probe_count;
 
@@ -48,7 +47,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     // normalized world position in [0,1] range
     let world_pos = vec2f(id.xy) / f32(resolution);
     let _probe_count = resolution / u32(pow(2f, 2f * f32(cascade_level)));
-    let probe_pos = (world_pos) * pow(2f, 2f * f32(cascade_level)) + vec2f(0.5/f32(resolution));
+    // let probe_pos = (world_pos) * pow(2f, 2f * f32(cascade_level)) + vec2f(0.5/f32(resolution));
+    let probe_pos = (vec2f(id.xy) + vec2f(0.5)) / f32(_probe_count);
 
     // prune threads
     if (probe_pos.x > 1.0 || probe_pos.y > 1.0) { return; }
@@ -69,6 +69,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             }
             case 1u: {
                 textureStore(output2, pix_pos, ray_radiance);
+            }
+            case 2u: {
+                textureStore(output3, pix_pos, ray_radiance);
             }
             default: {
                 // do nothing
