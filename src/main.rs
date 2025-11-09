@@ -4,7 +4,7 @@ use v4::{
         material::{ShaderAttachment, ShaderBufferAttachment, ShaderTextureAttachment},
     }, engine_support::texture_support::Texture, scene, V4
 };
-use wgpu::{Features, StorageTextureAccess, TextureFormat};
+use wgpu::{StorageTextureAccess, TextureFormat};
 
 use compute_texture_transfer_component::{ComputeTextureTransferComponent};
 
@@ -15,6 +15,7 @@ async fn main() {
     let mut engine = V4::builder()
         .window_settings(640, 640, "Pacific", None)
         .limits(wgpu::Limits{max_bind_groups: 8, ..Default::default()})
+        .features(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES)
         .build()
         .await;
 
@@ -56,6 +57,40 @@ async fn main() {
         false,
         wgpu::TextureUsages::COPY_SRC,
     );
+
+    let cascade_texture_merge = Texture::create_texture(
+        device,
+        HIGHEST_PROBE_CNT * 8,
+        HIGHEST_PROBE_CNT * 8,
+        TextureFormat::Rgba8Unorm,
+        Some(StorageTextureAccess::ReadWrite),
+        false,
+        wgpu::TextureUsages::COPY_SRC,
+    );
+    let cascade_texture2_merge = Texture::create_texture(
+        device,
+        HIGHEST_PROBE_CNT * 4,
+        HIGHEST_PROBE_CNT * 4,
+        TextureFormat::Rgba8Unorm,
+        Some(StorageTextureAccess::ReadWrite),
+        false,
+        wgpu::TextureUsages::COPY_SRC,
+    );
+    let cascade_texture3_merge = Texture::create_texture(
+        device,
+        HIGHEST_PROBE_CNT * 2,
+        HIGHEST_PROBE_CNT * 2,
+        TextureFormat::Rgba8Unorm,
+        Some(StorageTextureAccess::ReadWrite),
+        false,
+        wgpu::TextureUsages::COPY_SRC,
+    );
+
+    let merging_input = MergingInput{
+        current_level: 2,
+        l0_probe_count: HIGHEST_PROBE_CNT,
+        l0_angular_sample_count: 64,
+    };
 
     let surface_objects = vec![
         SurfaceObject {pos: [0.2, 0.2], radius: 0.2, color: [1.0; 3], object_type: 1, data: 1.0},
@@ -109,13 +144,25 @@ async fn main() {
                         )),
                         // fix this later
                         // order of 'output's follow order of textures passed in
-                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
-                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture2, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture.clone(), visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture2.clone(), visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     ],
-                    output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                    output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3.clone(), visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     shader_path: "shaders/cascadeComputeCalculation.wgsl",
                     workgroup_counts: (HIGHEST_PROBE_CNT, HIGHEST_PROBE_CNT, 3),
                     ident: "cascade_compute",
+                ),
+                Compute(
+                    input: vec![
+                        ShaderAttachment::Buffer(ShaderBufferAttachment::new(
+                            device, bytemuck::cast_slice(&[merging_input]), wgpu::BufferBindingType::Storage { read_only: false }, wgpu::ShaderStages::COMPUTE, wgpu::BufferUsages::empty()
+                        )),
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture_merge, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture2_merge, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                    ],
+                    output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3_merge, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                    shader_path: "shaders/cascadeMergeCompute.wgsl",
+                    workgroup_counts: (HIGHEST_PROBE_CNT, HIGHEST_PROBE_CNT, 1),
                 )
             ],
             components: [
@@ -164,4 +211,12 @@ struct SurfaceObject {
     object_type: i32, // 0 for surface, 1 for light
     color: [f32; 3],
     data: f32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct MergingInput {
+    current_level: u32,
+    l0_probe_count: u32,
+    l0_angular_sample_count: u32,
 }

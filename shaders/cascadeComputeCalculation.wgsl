@@ -58,7 +58,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         let interval = 0.5/f32(resolution) * vec2f(interval_scale(cascade_level), interval_scale(cascade_level + 1u));
         let ray_radiance = cast_ray_in_direction(
             probe_pos,
-            (f32(i) / f32(angular_sample_count) + 1.0/8.0) * (2.0 * PI),
+            (f32(i) / f32(angular_sample_count)/*  + 1.0/8.0 */) * (2.0 * PI),
             interval);
         
         let pix_pos = angular_sample_count_sqrt * vec2u(id.xy) + vec2u(i % angular_sample_count_sqrt, i / angular_sample_count_sqrt);
