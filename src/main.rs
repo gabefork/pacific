@@ -105,7 +105,7 @@ async fn main() {
                         )),
                         ShaderAttachment::Buffer(ShaderBufferAttachment::new(
                             device, bytemuck::cast_slice(&surface_objects), wgpu::BufferBindingType::Uniform, wgpu::ShaderStages::COMPUTE, wgpu::BufferUsages::empty()
-                        ))
+                        )),
                         // fix this later
                         // order of 'output's follow order of textures passed in
                         ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),

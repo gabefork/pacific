@@ -132,7 +132,8 @@ fn cast_ray(ray_origin: vec2<f32>, direction: vec2<f32>, max_distance: f32, excl
 
     var hit_object: RaycastResult;
     hit_object.object_index = -1;
-    while (total_dist < max_distance) {
+    var iter_count = 0;
+    while (total_dist < max_distance && iter_count < 100) {
         var ray_pos = ray_origin + direction * total_dist;
 
         let closest_object_index = find_closest_object(ray_pos, excluded_index);
@@ -144,6 +145,7 @@ fn cast_ray(ray_origin: vec2<f32>, direction: vec2<f32>, max_distance: f32, excl
             break;
         }
         total_dist = total_dist + distance;
+        iter_count++;
     }
     return hit_object;
 }
