@@ -9,6 +9,7 @@ use v4::{
 #[component]
 pub struct ComputeTextureTransferComponent {
     compute_id: ComponentId,
+    merge_id: ComponentId,
     ignore_material: ComponentId,
     texture_slot: usize,
 }
@@ -32,6 +33,15 @@ impl ComponentSystem for ComputeTextureTransferComponent {
         }
         let compute = compute.unwrap();
 
+        let merge = computes
+            .iter()
+            .filter(|compute| compute.id() == self.merge_id)
+            .next();
+        if merge.is_none() {
+            return;
+        }
+        let merge = merge.unwrap();
+
         let material = materials
             .iter()
             .filter(|material| material.id() != self.ignore_material)
@@ -40,8 +50,21 @@ impl ComponentSystem for ComputeTextureTransferComponent {
             return;
         }
         let material = material.unwrap();
-        if let Some(compute_output) = compute.output_attachments() {
-            if let ShaderAttachment::Texture(compute_tex) = compute_output {
+        let compute_output = compute.input_attachments();
+        // if let Some(compute_output) = compute.input_attachments() {
+            let merge_input = merge.input_attachments();
+            for i in 2..5_usize {
+                if let ShaderAttachment::Texture(comp_tex) = &compute_output[i] {
+                    if let ShaderAttachment::Texture(merge_tex) = &merge_input[i - 1] {
+                        encoder.copy_texture_to_texture(
+                            comp_tex.texture.texture().as_image_copy(),
+                            merge_tex.texture.texture().as_image_copy(),
+                            merge_tex.texture.texture().size(),
+                        );
+                    }
+                }
+            }
+            if let Some(ShaderAttachment::Texture(compute_tex)) = merge_input.get(1) {
                 if let Some(ShaderAttachment::Texture(material_tex)) =
                     material.attachments().get(self.texture_slot)
                 {
@@ -52,6 +75,6 @@ impl ComponentSystem for ComputeTextureTransferComponent {
                     );
                 }
             }
-        }
+        // }
     }
 }

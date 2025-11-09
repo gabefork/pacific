@@ -20,6 +20,9 @@ struct Ray {
     y_pos: f32
 }
 
+const LINEAR_PROBE_COUNT = 128u;
+const RADIAL_SAMPLE_COUNT_SQRT = 8u;
+
 @fragment
 fn main(in: VertexOut) -> @location(0) vec4f { 
     return get_fluence(in.tex_coords);
@@ -29,7 +32,7 @@ fn get_radiance_from_probe(probe_bottom_left_coord: vec2f) -> vec4f {
     var sum = vec4f(0.0);
     for (var i = 0; i < 4; i++) {
         for (var j = 0; j < 4; j++) {
-            sum += textureSample(cascade, sample, probe_bottom_left_coord + vec2f(f32(i), f32(j)) / (32.0 * 4.0));
+            sum += textureSample(cascade, sample, probe_bottom_left_coord + vec2f(f32(i), f32(j)) / f32(LINEAR_PROBE_COUNT * RADIAL_SAMPLE_COUNT_SQRT));
         }
     }
 
@@ -37,7 +40,7 @@ fn get_radiance_from_probe(probe_bottom_left_coord: vec2f) -> vec4f {
 }
 
 fn get_fluence(pos: vec2f) -> vec4f {
-    let bottom_left_coord = floor(pos * 32.0) / 32.0;
+    let bottom_left_coord = floor(pos * f32(LINEAR_PROBE_COUNT)) / f32(LINEAR_PROBE_COUNT);
 
     var fluence = vec4f(0.0);
     for (var i = 0; i < 2; i++) {

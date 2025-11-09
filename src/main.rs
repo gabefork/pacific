@@ -23,17 +23,18 @@ async fn main() {
     let device = rendering_manager.device();
 
     // actually square root of probe count
-    const HIGHEST_PROBE_CNT: u32 = 16;
+    const HIGHEST_PROBE_CNT: u32 = 128;
+    const ANGULAR_COUNT_SQRT: u32 = 8;
     let cascade_input = CascadeInput {
         l0_probe_count: HIGHEST_PROBE_CNT,
-        angular_sample_count: 64,
+        angular_sample_count: ANGULAR_COUNT_SQRT * ANGULAR_COUNT_SQRT,
         // distance_between_probes: 4.0,
         // cascade_levels: 2,
     };
     let cascade_texture = Texture::create_texture(
         device,
-        HIGHEST_PROBE_CNT * 8,
-        HIGHEST_PROBE_CNT * 8,
+        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT,
+        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT,
         TextureFormat::Rgba8Unorm,
         Some(StorageTextureAccess::WriteOnly),
         false,
@@ -41,8 +42,8 @@ async fn main() {
     );
     let cascade_texture2 = Texture::create_texture(
         device,
-        HIGHEST_PROBE_CNT * 4,
-        HIGHEST_PROBE_CNT * 4,
+        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 2,
+        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 2,
         TextureFormat::Rgba8Unorm,
         Some(StorageTextureAccess::WriteOnly),
         false,
@@ -50,8 +51,8 @@ async fn main() {
     );
     let cascade_texture3 = Texture::create_texture(
         device,
-        HIGHEST_PROBE_CNT * 2,
-        HIGHEST_PROBE_CNT * 2,
+        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 4,
+        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 4,
         TextureFormat::Rgba8Unorm,
         Some(StorageTextureAccess::WriteOnly),
         false,
@@ -60,8 +61,8 @@ async fn main() {
 
     let cascade_texture_merge = Texture::create_texture(
         device,
-        HIGHEST_PROBE_CNT * 8,
-        HIGHEST_PROBE_CNT * 8,
+        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT,
+        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT,
         TextureFormat::Rgba8Unorm,
         Some(StorageTextureAccess::ReadWrite),
         false,
@@ -69,8 +70,8 @@ async fn main() {
     );
     let cascade_texture2_merge = Texture::create_texture(
         device,
-        HIGHEST_PROBE_CNT * 4,
-        HIGHEST_PROBE_CNT * 4,
+        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 2,
+        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 2,
         TextureFormat::Rgba8Unorm,
         Some(StorageTextureAccess::ReadWrite),
         false,
@@ -78,8 +79,8 @@ async fn main() {
     );
     let cascade_texture3_merge = Texture::create_texture(
         device,
-        HIGHEST_PROBE_CNT * 2,
-        HIGHEST_PROBE_CNT * 2,
+        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 4,
+        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 4,
         TextureFormat::Rgba8Unorm,
         Some(StorageTextureAccess::ReadWrite),
         false,
@@ -89,12 +90,13 @@ async fn main() {
     let merging_input = MergingInput{
         current_level: 2,
         l0_probe_count: HIGHEST_PROBE_CNT,
-        l0_angular_sample_count: 64,
+        l0_angular_sample_count: ANGULAR_COUNT_SQRT * ANGULAR_COUNT_SQRT,
     };
 
     let surface_objects = vec![
-        SurfaceObject {pos: [0.2, 0.2], radius: 0.2, color: [1.0; 3], object_type: 1, data: 1.0},
-        SurfaceObject {pos: [0.5, 0.75], radius: 0.3, color: [0.251, 0.529, 0.969], object_type: 0, data: 0.0}
+        SurfaceObject {pos: [0.2, 0.2], radius: 0.2, color: [1.0; 3], object_type: 1, data: 0.2},
+        SurfaceObject {pos: [0.5, 0.75], radius: 0.3, color: [0.251, 0.529, 0.969], object_type: 0, data: 0.0},
+        SurfaceObject {pos: [1.0, 0.0], radius: 0.05, color: [0.8, 0.0, 0.0], object_type: 1, data: 0.2},
     ];
 
     scene! {
@@ -110,7 +112,7 @@ async fn main() {
                 },
                 attachments: [
                     Texture(
-                        texture: Texture::create_texture(device, HIGHEST_PROBE_CNT * 4, HIGHEST_PROBE_CNT * 4, TextureFormat::Rgba8Unorm, None, true, wgpu::TextureUsages::empty()),
+                        texture: Texture::create_texture(device, HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT, HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT, TextureFormat::Rgba8Unorm, None, true, wgpu::TextureUsages::empty()),
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     )
                 ],
@@ -146,8 +148,9 @@ async fn main() {
                         // order of 'output's follow order of textures passed in
                         ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture.clone(), visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                         ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture2.clone(), visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3.clone(), visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     ],
-                    output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3.clone(), visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                    // output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3.clone(), visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     shader_path: "shaders/cascadeComputeCalculation.wgsl",
                     workgroup_counts: (HIGHEST_PROBE_CNT, HIGHEST_PROBE_CNT, 3),
                     ident: "cascade_compute",
@@ -159,14 +162,17 @@ async fn main() {
                         )),
                         ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture_merge, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                         ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture2_merge, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3_merge, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     ],
-                    output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3_merge, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                    // output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3_merge, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     shader_path: "shaders/cascadeMergeCompute.wgsl",
+                    iterate_count: 2,
                     workgroup_counts: (HIGHEST_PROBE_CNT, HIGHEST_PROBE_CNT, 1),
+                    ident: "cascade_merge",
                 )
             ],
             components: [
-                ComputeTextureTransferComponent(compute_id: ident("cascade_compute"), ignore_material: ident("ignore"), texture_slot: 0)
+                ComputeTextureTransferComponent(compute_id: ident("cascade_compute"), merge_id: ident("cascade_merge"), ignore_material: ident("ignore"), texture_slot: 0)
             ]
         }
     };

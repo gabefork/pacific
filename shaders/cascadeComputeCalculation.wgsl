@@ -6,7 +6,7 @@
 @group(4) @binding(0) var output3: texture_storage_2d<rgba8unorm, write>;
 
 const PI = 3.14159265;
-const NUM_OBJ = 2;
+const NUM_OBJ = 3;
 // constant instead of passing because lior did not implement arrays in wgsl yet
 // const CASCSADE_LEVELS = 3u;
 
@@ -101,7 +101,7 @@ fn cast_ray_in_direction(position: vec2f, angle: f32, interval: vec2f) -> vec4f 
     let ray_intersection_object = obj_arr[ray_result.object_index];
     switch ray_intersection_object.objectType {
         case 0: {
-            return vec4f(ray_intersection_object.color, 1.0) /* * get_light_attenuation(ray_intersection_object.pos, max_distance, ray_result.object_index) */;
+            return vec4f(ray_intersection_object.color, 1.0) * get_light_attenuation(ray_intersection_object.pos, max_distance, ray_result.object_index);
         }
         case 1: {
             return ray_intersection_object.data * vec4f(ray_intersection_object.color, 1.0);
@@ -152,9 +152,9 @@ fn cast_ray(ray_origin: vec2<f32>, direction: vec2<f32>, max_distance: f32, excl
 }
 
 fn get_light_attenuation(pos: vec2f, max_distance: f32, origin_obj_index: i32) -> vec4<f32>{
-    var accumulated_light = vec4f(0.0);
+    // var accumulated_light = vec4f(0.0);
 
-    for(var i = 0; i < NUM_OBJ; i++) {
+    /* for(var i = 0; i < NUM_OBJ; i++) {
         let obj = obj_arr[i];
         if(obj.objectType != 1) {
             continue;
@@ -168,9 +168,10 @@ fn get_light_attenuation(pos: vec2f, max_distance: f32, origin_obj_index: i32) -
         let raycast_obj = obj_arr[raycast_result.object_index];
         accumulated_light += vec4f(f32(raycast_result.object_index), f32(raycast_result.object_index), 0.0, 1.0);
         if(raycast_obj.objectType == 1) {
-            accumulated_light += vec4f(1.0, 0.0, 0.0, 1.0) /* raycast_obj.data / raycast_result.distance */ /* * vec4f(obj_arr[raycast_result.object_index].color, 1.0) */;
+            accumulated_light += obj_arr[0].data / distance(obj_arr[0].pos, obj_arr[1].pos) * vec4f(obj_arr[0].color, 1.0); /* raycast_obj.data / raycast_result.distance */ /* * vec4f(obj_arr[raycast_result.object_index].color, 1.0); */
         }
-    }
+    } */
 
-    return accumulated_light;
+    // return accumulated_light;
+    return vec4f(0.05 / distance(obj_arr[0].pos, pos)) * vec4f(obj_arr[0].color, 1.0) + (vec4f(obj_arr[2].data / distance(obj_arr[2].pos, pos)) * vec4f(obj_arr[2].color, 1.0));
 }
