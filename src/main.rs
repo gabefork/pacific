@@ -4,7 +4,7 @@ use v4::{
         material::{ShaderAttachment, ShaderBufferAttachment, ShaderTextureAttachment},
     }, engine_support::texture_support::Texture, scene, V4
 };
-use wgpu::{StorageTextureAccess, TextureFormat};
+use wgpu::{Features, StorageTextureAccess, TextureFormat};
 
 use compute_texture_transfer_component::{ComputeTextureTransferComponent};
 
@@ -14,6 +14,7 @@ pub mod compute_texture_transfer_component;
 async fn main() {
     let mut engine = V4::builder()
         .window_settings(640, 640, "Pacific", None)
+        .limits(wgpu::Limits{max_bind_groups: 8, ..Default::default()})
         .build()
         .await;
 
