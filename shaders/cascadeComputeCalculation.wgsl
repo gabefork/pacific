@@ -13,7 +13,7 @@ struct CascadeInput {
 @workgroup_size(1)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     let angular_sample_count_sqrt = u32(sqrt(f32(input.angular_sample_count)));
-    let world_pos = vec2f(id.xy) / 16.0;
+    let world_pos = vec2f(id.xy) / 32.0;
     for (var i = 0u; i < input.angular_sample_count; i++) {
         let ray_radiance = cast_ray_in_direction(
             world_pos + vec2f(1.0/32.0),

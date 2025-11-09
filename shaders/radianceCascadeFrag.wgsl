@@ -21,8 +21,30 @@ struct Ray {
 }
 
 @fragment
-fn main(vertex_output: VertexOut) -> @location(0) vec4f { 
-    return textureSample(cascade, sample, vertex_output.tex_coords);
-    
-    // return vec4f(vertex_output.tex_coords, 0.0, 1.0);
+fn main(in: VertexOut) -> @location(0) vec4f { 
+    return get_fluence(in.tex_coords);
+}
+
+fn get_radiance_from_probe(probe_bottom_left_coord: vec2f) -> vec4f {
+    var sum = vec4f(0.0);
+    for (var i = 0; i < 4; i++) {
+        for (var j = 0; j < 4; j++) {
+            sum += textureSample(cascade, sample, probe_bottom_left_coord + vec2f(f32(i), f32(j)) / (32.0 * 4.0));
+        }
+    }
+
+    return sum;
+}
+
+fn get_fluence(pos: vec2f) -> vec4f {
+    let bottom_left_coord = floor(pos * 32.0) / 32.0;
+
+    var fluence = vec4f(0.0);
+    for (var i = 0; i < 2; i++) {
+        for (var j = 0; j < 2; j++) {
+            fluence += get_radiance_from_probe(bottom_left_coord + vec2f(f32(i), f32(j)) / 32.0);
+        }
+    }
+
+    return fluence;
 }

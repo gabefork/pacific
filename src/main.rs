@@ -22,21 +22,21 @@ async fn main() {
     let device = rendering_manager.device();
 
     let cascade_input = CascadeInput {
-        linear_sample_count: 16,
-        angular_sample_count: 16,
+        linear_sample_count: 32,
+        angular_sample_count: 32,
         distance_between_probes: 4.0,
     };
     let cascade_texture = Texture::create_texture(
         device,
-        16 * 4,
-        16 * 4,
+        32 * 4,
+        32 * 4,
         TextureFormat::Rgba8Unorm,
         Some(StorageTextureAccess::WriteOnly),
         false,
         wgpu::TextureUsages::COPY_SRC,
     );
 
-    let mut buf = ImageBuffer::new(64, 64);
+    let mut buf = ImageBuffer::new(32 * 4, 32 * 4);
 
     for (_, _, pix) in buf.enumerate_pixels_mut() {
         *pix = image::Rgba([255; 4]);
@@ -55,7 +55,7 @@ async fn main() {
                 },
                 attachments: [
                     Texture(
-                        texture: Texture::create_texture(device, 16 * 4, 16 * 4, TextureFormat::Rgba8Unorm, None, true, wgpu::TextureUsages::empty()),
+                        texture: Texture::create_texture(device, 32 * 4, 32 * 4, TextureFormat::Rgba8Unorm, None, true, wgpu::TextureUsages::empty()),
                         visibility: wgpu::ShaderStages::FRAGMENT,
                     )
                 ],
@@ -87,7 +87,7 @@ async fn main() {
                     ],
                     output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     shader_path: "shaders/cascadeComputeCalculation.wgsl",
-                    workgroup_counts: (16, 16, 1),
+                    workgroup_counts: (32, 32, 1),
                     ident: "cascade_compute",
                 )
             ],
