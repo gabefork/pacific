@@ -1,14 +1,18 @@
 @group(0) @binding(0) var<uniform> input: CascadeInput;
 @group(1) @binding(0) var<uniform> obj_arr: array<Object, NUM_OBJ>;
 @group(2) @binding(0) var output: texture_storage_2d<rgba8unorm, write>;
+@group(3) @binding(0) var output2: texture_storage_2d<rgba8unorm, write>;
 
 const PI = 3.14159265;
 const NUM_OBJ = 2;
+// constant instead of passing because lior did not implement arrays in wgsl yet
+const CASCSADE_LEVELS = 2u;
 
 struct CascadeInput {
-    linear_sample_count: u32,
+    l0_probe_count: u32,
     angular_sample_count: u32,
-    distance_between_probes: f32,
+    // distance_between_probes: f32,
+    // cascade_levels: u32,
 }
 
 struct Object {
@@ -32,18 +36,50 @@ fn sphereSDF(ray_position: vec2<f32>, pos: vec2<f32>, radius: f32) -> f32{
 @compute
 @workgroup_size(1)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-    let angular_sample_count_sqrt = u32(sqrt(f32(input.angular_sample_count)));
-    let world_pos = vec2f(id.xy) / 16.0;
+    // order in lowest cascade to highest cascade
+    // var output_level = array<texture_storage_2d<rgba8unorm, write>, CASCSADE_LEVELS>(output, output2);
+    let cascade_level = id.z;
+    let resolution = input.l0_probe_count;
 
-    for (var i = 0u; i < input.angular_sample_count; i++) {
+    // actual angular sample count for this cascade level
+    let angular_sample_count = input.angular_sample_count << (2u * cascade_level);
+    let angular_sample_count_sqrt = u32(sqrt(f32(angular_sample_count)));
+    
+    // normalized world position in [0,1] range
+    let world_pos = vec2f(id.xy) / f32(resolution);
+    let _probe_count = resolution / u32(pow(2f, 2f * f32(cascade_level)));
+    let probe_pos = (world_pos) * pow(2f, 2f * f32(cascade_level)) + vec2f(0.5/f32(resolution));
+
+    // prune threads
+    if (probe_pos.x > 1.0 || probe_pos.y > 1.0) { return; }
+
+    for (var i = 0u; i < angular_sample_count; i++) {
+        let interval = 0.5/f32(resolution) * vec2f(interval_scale(cascade_level), interval_scale(cascade_level + 1u));
         let ray_radiance = cast_ray_in_direction(
-            world_pos + vec2f(1.0/32.0),
-            (f32(i) / f32(input.angular_sample_count) + 1.0/8.0) * (2.0 * PI),
-            vec2f(0.0, 1.0/32.0),
-            );
+            probe_pos,
+            (f32(i) / f32(angular_sample_count) + 1.0/8.0) * (2.0 * PI),
+            interval);
+        
         let pix_pos = angular_sample_count_sqrt * vec2u(id.xy) + vec2u(i % angular_sample_count_sqrt, i / angular_sample_count_sqrt);
-        textureStore(output, pix_pos, ray_radiance);
+        
+        // 0 scalability
+        switch (cascade_level) {
+            case 0u: {
+                textureStore(output, pix_pos, ray_radiance);
+            }
+            case 1u: {
+                textureStore(output2, pix_pos, ray_radiance);
+            }
+            default: {
+                // do nothing
+            }
+        }
     }
+}
+
+fn interval_scale(cascade_level: u32) -> f32 {
+    if (cascade_level == 0u) { return 0.0; }
+    return f32(1u << (2u * cascade_level));
 }
 
 fn cast_ray_in_direction(position: vec2f, angle: f32, interval: vec2f) -> vec4f {
