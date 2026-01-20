@@ -1,13 +1,14 @@
 @group(0) @binding(0) var<uniform> input: CascadeInput;
-@group(1) @binding(0) var<uniform> obj_arr: array<Object, NUM_OBJ>;
+@group(1) @binding(0) var<uniform> obj_arr: array<SurfaceObject, 3u>;//NUM_OBJ>;
 // number of outputs should be equal to id.z range ( = cascade levels)
 @group(2) @binding(0) var output: texture_storage_2d<rgba8unorm, write>;
 @group(3) @binding(0) var output2: texture_storage_2d<rgba8unorm, write>;
 @group(4) @binding(0) var output3: texture_storage_2d<rgba8unorm, write>;
 
 const PI = 3.14159265;
-const NUM_OBJ = 3;
+const NUM_OBJ: i32 = 3;
 // constant instead of passing because lior did not implement arrays in wgsl yet
+// MAKE SURE NUM_OBJ MATCHES THE SIZE OF obj_arr
 // const CASCSADE_LEVELS = 3u;
 
 struct CascadeInput {
@@ -17,7 +18,7 @@ struct CascadeInput {
     // cascade_levels: u32,
 }
 
-struct Object {
+struct SurfaceObject {
     pos: vec2<f32>,
     radius: f32,
     objectType: i32, // 0 for surface, 1 for light
@@ -81,6 +82,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 }
 
+// scale marching interval based on cascade level
 fn interval_scale(cascade_level: u32) -> f32 {
     if (cascade_level == 0u) { return 0.0; }
     return f32(1u << (2u * cascade_level));
@@ -94,17 +96,22 @@ fn cast_ray_in_direction(position: vec2f, angle: f32, interval: vec2f) -> vec4f 
     let max_distance = interval.y - interval.x;
 
     let ray_result = cast_ray(ray_origin, ray_direction, max_distance, -1);
-    if(ray_result.object_index == -1) {
-        return vec4f(0.0);
-    }
-
-    let ray_intersection_object = obj_arr[ray_result.object_index];
-    switch ray_intersection_object.objectType {
+    // return vec4f(f32(ray_result.object_index)/f32(NUM_OBJ), 0.0, 0.0, 1.0); // testing
+    if (ray_result.object_index == -1) { return vec4f(0.0); } // no intersection
+    
+    let intersected_obj = obj_arr[u32(ray_result.object_index)];
+    switch intersected_obj.objectType {
         case 0: {
-            return vec4f(ray_intersection_object.color, 1.0) * get_light_attenuation(ray_intersection_object.pos, max_distance, ray_result.object_index);
+            return vec4f(intersected_obj.color, 1.0) *
+                get_light_attenuation(
+                    ray_result.intersection_pos,
+                    max_distance,
+                    ray_result.object_index
+                );
         }
         case 1: {
-            return ray_intersection_object.data * vec4f(ray_intersection_object.color, 1.0);
+            return intersected_obj.data * vec4f(intersected_obj.color, 1.0);
+            //vec4f(intersected_obj.data * intersected_obj.color, 1.0);
         }
         default {
             return vec4f(0.0);
@@ -112,17 +119,18 @@ fn cast_ray_in_direction(position: vec2f, angle: f32, interval: vec2f) -> vec4f 
     }
 }
 
+// check every object (except excluded) and return index with min distance
 fn find_closest_object(ray_pos: vec2<f32>, excluded_index: i32) -> u32 {
-    var min_distance= sphereSDF(ray_pos, obj_arr[0].pos, obj_arr[0].radius);
-    var min_obj = 0u;
-    for (var i = 1u; i < u32(NUM_OBJ); i++) {
-        if(excluded_index != -1 && i == u32(excluded_index)) {
+    var min_distance= 0x1.fffffep+127f; // start at a high value
+    var min_obj = u32(-1i);
+    for (var i = 0u; i < u32(NUM_OBJ); i++) {
+         if (excluded_index != -1 && i == u32(excluded_index)) {
             continue;
         }
         let distance = sphereSDF(ray_pos, obj_arr[i].pos, obj_arr[i].radius);
         if (distance < min_distance) {
             min_distance = distance;
-            min_obj =  i;
+            min_obj = i;
         }
     }
     return min_obj;
@@ -135,7 +143,8 @@ fn cast_ray(ray_origin: vec2<f32>, direction: vec2<f32>, max_distance: f32, excl
     hit_object.object_index = -1;
     var iter_count = 0;
     while (total_dist < max_distance && iter_count < 100) {
-        var ray_pos = ray_origin + direction * total_dist;
+        var ray_pos = ray_origin + normalize(direction) * total_dist;
+        hit_object.intersection_pos = ray_pos;
 
         let closest_object_index = find_closest_object(ray_pos, excluded_index);
         let closest_object = obj_arr[closest_object_index];
@@ -151,14 +160,15 @@ fn cast_ray(ray_origin: vec2<f32>, direction: vec2<f32>, max_distance: f32, excl
     return hit_object;
 }
 
-fn simple_cast_ray(ray_origin: vec2<f32>, direction: vec2<f32>, max_distance: f32, excluded_index: i32, step_count: f32) -> RaycastResult {
+fn simple_cast_ray(ray_origin: vec2<f32>, direction: vec2<f32>, max_distance: f32, excluded_index: i32, step_dist: f32) -> RaycastResult {
     var total_dist = 0.;
 
     var hit_object: RaycastResult;
     hit_object.object_index = -1;
     var iter_count = 0;
     while (total_dist < max_distance && iter_count < 100) {
-        var ray_pos = ray_origin + direction * total_dist;
+        var ray_pos = ray_origin + normalize(direction) * total_dist;
+        hit_object.intersection_pos = ray_pos;
 
         let closest_object_index = find_closest_object(ray_pos, excluded_index);
         let closest_object = obj_arr[closest_object_index];
@@ -168,43 +178,67 @@ fn simple_cast_ray(ray_origin: vec2<f32>, direction: vec2<f32>, max_distance: f3
             hit_object.distance = total_dist;
             break;
         }
-        total_dist = total_dist + step_count;
+        total_dist = total_dist + step_dist;
         iter_count++;
     }
     return hit_object;
 }
 
 fn get_light_attenuation(pos: vec2f, max_distance: f32, origin_obj_index: i32) -> vec4<f32>{
-    // var accumulated_light = vec4f(0.0);
+    var accumulated_light = vec4f(0.0);
 
-    /* for(var i = 0; i < NUM_OBJ; i++) {
+    for(var i = 0; i < NUM_OBJ; i++) {
         let obj = obj_arr[i];
-        if(obj.objectType != 1) {
-            continue;
-        }
+        if (obj.objectType != 1 || i == origin_obj_index) { continue; } // only cast from lights (type 1)
 
-        let raycast_result = cast_ray(pos, obj_arr[i].pos - pos, max_distance, origin_obj_index);
-        if(raycast_result.object_index == -1) {
-            continue;
-        }
+        let raycast_result = cast_ray( //investigate
+            pos,
+            obj.pos - pos,
+            1, // max_distance barely reaches
+            origin_obj_index);
+        if (raycast_result.object_index == -1) { continue; }
 
         let raycast_obj = obj_arr[raycast_result.object_index];
-        accumulated_light += vec4f(f32(raycast_result.object_index), f32(raycast_result.object_index), 0.0, 1.0);
-        if(raycast_obj.objectType == 1) {
-            accumulated_light += obj_arr[0].data / distance(obj_arr[0].pos, obj_arr[1].pos) * vec4f(obj_arr[0].color, 1.0); /* raycast_obj.data / raycast_result.distance */ /* * vec4f(obj_arr[raycast_result.object_index].color, 1.0); */
-        }
-    } */
+        let d = raycast_result.distance;
 
-    // return accumulated_light;
-    /* let dir = obj_arr[0].pos - pos;
-    let ray = simple_cast_ray(pos + 0.1 * dir, dir, 1.0, -1, 0.01);
-    if ray.object_index == 0 {
-        return vec4f(1.0, 0.0, 0.0, 1.0);
-    } else if ray.object_index == 1 {
-        return vec4f(0.0, 1.0, 0.0, 1.0);
-    } else {
-        return vec4f(0.0, 0.0, 1.0, 1.0);
-    } */
+        // if raycast_result.object_index == 0 {
+        //     accumulated_light += vec4f(1.0, 0.0, 0.0, 1.0);
+        // } else if raycast_result.object_index == 1 {
+        //     accumulated_light += vec4f(0.0, 1.0, 0.0, 1.0);
+        // } else if raycast_result.object_index == 2 {
+        //     accumulated_light += vec4f(0.0, 0.0, 1.0, 1.0);
+        // } else {
+        //     return vec4f(0.0, 0.0, 0.0, 1.0);
+        // }
+
+        // TODO: account for original obj blocking light
+        // TODO: fine-tune attenuation formula
+        if (raycast_obj.objectType == 1) {
+            // accumulated_light += obj_arr[0].data / distance(obj_arr[0].pos, obj_arr[1].pos) * vec4f(obj_arr[0].color, 1.0);
+            accumulated_light += raycast_obj.data / (1.0 + 4.0*d + 4.0*d*d) * vec4f(raycast_obj.color, 1.0);
+            // accumulated_light += vec4f(raycast_obj.data / raycast_result.distance * raycast_obj.color, 1.0);
+        }
+    }
+
+    return accumulated_light;
+    // Test raycasting to object 0
+    // let dir = obj_arr[0].pos - pos;
+    // let ray = simple_cast_ray(
+    //     pos + 0.1 * dir,
+    //     dir,
+    //     1.0,
+    //     -1,
+    //     0.01);
+    
+    // if ray.object_index == 0 {
+    //     return vec4f(1.0, 0.0, 0.0, 1.0);
+    // } else if ray.object_index == 1 {
+    //     return vec4f(0.0, 1.0, 0.0, 1.0);
+    // } else if ray.object_index == 2 {
+    //     return vec4f(0.0, 0.0, 1.0, 1.0);
+    // } else {
+    //     return vec4f(0.0, 0.0, 0.0, 1.0);
+    // }
     // return vec4f(vec3f(ray.distance), 1.0);
-    return vec4f(0.05 / distance(obj_arr[0].pos, pos)) * vec4f(obj_arr[0].color, 1.0) + (vec4f(obj_arr[2].data / distance(obj_arr[2].pos, pos)) * vec4f(obj_arr[2].color, 1.0));
+    // return vec4f(0.05 / distance(obj_arr[0].pos, pos)) * vec4f(obj_arr[0].color, 1.0) + (vec4f(obj_arr[2].data / distance(obj_arr[2].pos, pos)) * vec4f(obj_arr[2].color, 1.0));
 }

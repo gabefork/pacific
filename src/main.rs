@@ -93,10 +93,11 @@ async fn main() {
         l0_angular_sample_count: ANGULAR_COUNT_SQRT * ANGULAR_COUNT_SQRT,
     };
 
+    // objects in the scene
     let surface_objects = vec![
-        SurfaceObject {pos: [0.2, 0.2], radius: 0.2, color: [1.0; 3], object_type: 1, data: 0.2},
-        SurfaceObject {pos: [0.5, 0.75], radius: 0.3, color: [0.251, 0.529, 0.969], object_type: 0, data: 0.0},
-        SurfaceObject {pos: [1.0, 0.0], radius: 0.05, color: [0.8, 0.0, 0.0], object_type: 1, data: 0.08},
+        SurfaceObject {pos: [0.2, 0.2], radius: 0.2, color: [1.0; 3], object_type: 1, data: 0.2}, // white
+        SurfaceObject {pos: [0.5, 0.75], radius: 0.3, color: [0.251, 0.529, 0.969], object_type: 0, data: 0.05}, // blue ??
+        SurfaceObject {pos: [1.0, 0.0], radius: 0.05, color: [0.8, 0.0, 0.0], object_type: 1, data: 0.08}, // red
     ];
 
     scene! {
@@ -211,12 +212,12 @@ struct CascadeInput {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct SurfaceObject {
-    pos: [f32; 2],
-    radius: f32,
-    object_type: i32, // 0 for surface, 1 for light
-    color: [f32; 3],
-    data: f32,
+pub struct SurfaceObject {
+    pub pos: [f32; 2],
+    pub radius: f32,
+    pub object_type: i32, // 0 for surface, 1 for light
+    pub color: [f32; 3],
+    pub data: f32,
 }
 
 #[repr(C)]

@@ -76,16 +76,17 @@ fn current_ray_radiance(probe_id: vec2u, ray_index: u32, lo_angular_sample_count
 }
 
 fn store_current_ray_radiance(probe_id: vec2u, ray_index: u32, lo_angular_sample_count_sqrt: u32, color: vec4f) {
+    let pix = probe_id * lo_angular_sample_count_sqrt + offset_to_vector(i32(ray_index), lo_angular_sample_count_sqrt);
     switch input.layer {
         case 0u: {
             // TODO: Investigate
-            textureStore(output, probe_id * lo_angular_sample_count_sqrt + offset_to_vector(i32(ray_index), lo_angular_sample_count_sqrt), color);
+            textureStore(output, pix, color);
         }
         case 1u: {
-            textureStore(output2, probe_id *lo_angular_sample_count_sqrt + offset_to_vector(i32(ray_index), lo_angular_sample_count_sqrt), color);
+            textureStore(output2, pix, color);
         }
         default: {
-            textureStore(output2, probe_id *lo_angular_sample_count_sqrt  + offset_to_vector(i32(ray_index), lo_angular_sample_count_sqrt), vec4f(0.0));
+            textureStore(output2, pix, vec4f(0.0));
         }
     }
 }
@@ -106,10 +107,13 @@ fn sum_nearby_rays(lo_ray_index: u32, hi_angular_sample_count_sqrt: u32, hi_prob
 
 fn offset_index_to_vector(base_index: u32, offset: i32, hi_angular_sample_count_sqrt: u32) -> vec2u {
     let base = f32(4i * i32(base_index) + offset) % f32(hi_angular_sample_count_sqrt * hi_angular_sample_count_sqrt);
-    return vec2u(u32(base % f32(hi_angular_sample_count_sqrt)), u32(base / f32(hi_angular_sample_count_sqrt)));
+    return vec2u(u32(base % f32(hi_angular_sample_count_sqrt)), u32(base / f32(hi_angular_sample_count_sqrt)));    
+    // let base = u32(4i * i32(base_index) + offset) % (hi_angular_sample_count_sqrt * hi_angular_sample_count_sqrt);
+    // return vec2u(base % hi_angular_sample_count_sqrt, base / hi_angular_sample_count_sqrt);
 }
 
 
 fn offset_to_vector(offset: i32, hi_angular_sample_count_sqrt: u32) -> vec2u {
     return vec2u(u32(f32(offset) % f32(hi_angular_sample_count_sqrt)), u32(f32(offset) / f32(hi_angular_sample_count_sqrt)));
+    // return vec2u(u32(offset) % hi_angular_sample_count_sqrt, u32(offset) / hi_angular_sample_count_sqrt);
 }
