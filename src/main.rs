@@ -1,10 +1,14 @@
 use v4::{
-    builtin_components::mesh_component::{MeshComponent, VertexDescriptor}, ecs::{
+    V4, builtin_components::mesh_component::{MeshComponent, VertexData, VertexDescriptor}, ecs::{
         compute::Compute,
         material::{ShaderAttachment, ShaderBufferAttachment, ShaderTextureAttachment},
-    }, engine_support::texture_support::Texture, scene, V4
+    }, engine_support::texture_support::{TextureBundle, TextureProperties}, scene
 };
 use wgpu::{StorageTextureAccess, TextureFormat};
+use winit::{
+    dpi::PhysicalSize,
+    window::WindowAttributes,
+};
 
 use compute_texture_transfer_component::{ComputeTextureTransferComponent};
 
@@ -13,9 +17,13 @@ pub mod compute_texture_transfer_component;
 #[tokio::main]
 async fn main() {
     let mut engine = V4::builder()
-        .window_settings(640, 640, "Pacific", None)
+        .window_attributes(
+            WindowAttributes::default()
+                .with_surface_size(PhysicalSize::new(640, 640))
+                .with_title("Pacific")
+        )
         .limits(wgpu::Limits{max_bind_groups: 8, ..Default::default()})
-        .features(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES)
+        .features(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES | wgpu::Features::POLYGON_MODE_LINE)
         .build()
         .await;
 
@@ -24,67 +32,86 @@ async fn main() {
 
     // actually square root of probe count
     const HIGHEST_PROBE_CNT: u32 = 128;
-    const ANGULAR_COUNT_SQRT: u32 = 8;
+    const ANGULAR_COUNT_SQRT: u32 = 16;
+    const DIM: u32 = HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT;
     let cascade_input = CascadeInput {
         l0_probe_count: HIGHEST_PROBE_CNT,
         angular_sample_count: ANGULAR_COUNT_SQRT * ANGULAR_COUNT_SQRT,
         // distance_between_probes: 4.0,
         // cascade_levels: 2,
     };
-    let cascade_texture = Texture::create_texture(
+    let (cascade_texture, cascade_texture_bundle) = TextureBundle::create_texture(
         device,
-        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT,
-        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT,
-        TextureFormat::Rgba8Unorm,
-        Some(StorageTextureAccess::WriteOnly),
-        false,
-        wgpu::TextureUsages::COPY_SRC,
+        DIM,
+        DIM,
+        TextureProperties {
+            format: TextureFormat::Rgba8Unorm,
+            storage_texture: Some(StorageTextureAccess::WriteOnly),
+            is_sampled: false,
+            extra_usages: wgpu::TextureUsages::COPY_SRC,
+            ..Default::default()
+        }
     );
-    let cascade_texture2 = Texture::create_texture(
+    let (cascade_texture2, cascade_texture2_bundle) = TextureBundle::create_texture(
         device,
-        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 2,
-        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 2,
-        TextureFormat::Rgba8Unorm,
-        Some(StorageTextureAccess::WriteOnly),
-        false,
-        wgpu::TextureUsages::COPY_SRC,
+        DIM / 2,
+        DIM / 2,
+        TextureProperties {
+            format: TextureFormat::Rgba8Unorm,
+            storage_texture: Some(StorageTextureAccess::WriteOnly),
+            is_sampled: false,
+            extra_usages: wgpu::TextureUsages::COPY_SRC,
+            ..Default::default()
+        }
     );
-    let cascade_texture3 = Texture::create_texture(
+    let (cascade_texture3, cascade_texture3_bundle) = TextureBundle::create_texture(
         device,
-        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 4,
-        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 4,
-        TextureFormat::Rgba8Unorm,
-        Some(StorageTextureAccess::WriteOnly),
-        false,
-        wgpu::TextureUsages::COPY_SRC,
+        DIM / 4,
+        DIM / 4,
+        TextureProperties {
+            format: TextureFormat::Rgba8Unorm,
+            storage_texture: Some(StorageTextureAccess::WriteOnly),
+            is_sampled: false,
+            extra_usages: wgpu::TextureUsages::COPY_SRC,
+            ..Default::default()
+        }
     );
 
-    let cascade_texture_merge = Texture::create_texture(
+    let (cascade_texture_merge, cascade_texture_merge_bundle) = TextureBundle::create_texture(
         device,
-        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT,
-        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT,
-        TextureFormat::Rgba8Unorm,
-        Some(StorageTextureAccess::ReadWrite),
-        false,
-        wgpu::TextureUsages::COPY_SRC,
+        DIM,
+        DIM,
+        TextureProperties {
+            format: TextureFormat::Rgba8Unorm,
+            storage_texture: Some(StorageTextureAccess::ReadWrite),
+            is_sampled: false,
+            extra_usages: wgpu::TextureUsages::COPY_SRC,
+            ..Default::default()
+        }
     );
-    let cascade_texture2_merge = Texture::create_texture(
+    let (cascade_texture2_merge, cascade_texture2_merge_bundle) = TextureBundle::create_texture(
         device,
-        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 2,
-        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 2,
-        TextureFormat::Rgba8Unorm,
-        Some(StorageTextureAccess::ReadWrite),
-        false,
-        wgpu::TextureUsages::COPY_SRC,
+        DIM / 2,
+        DIM / 2,
+        TextureProperties {
+            format: TextureFormat::Rgba8Unorm,
+            storage_texture: Some(StorageTextureAccess::ReadWrite),
+            is_sampled: false,
+            extra_usages: wgpu::TextureUsages::COPY_SRC,
+            ..Default::default()
+        }
     );
-    let cascade_texture3_merge = Texture::create_texture(
+    let (cascade_texture3_merge, cascade_texture3_merge_bundle) = TextureBundle::create_texture(
         device,
-        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 4,
-        HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT / 4,
-        TextureFormat::Rgba8Unorm,
-        Some(StorageTextureAccess::ReadWrite),
-        false,
-        wgpu::TextureUsages::COPY_SRC,
+        DIM / 4,
+        DIM / 4,
+        TextureProperties {
+            format: TextureFormat::Rgba8Unorm,
+            storage_texture: Some(StorageTextureAccess::ReadWrite),
+            is_sampled: false,
+            extra_usages: wgpu::TextureUsages::COPY_SRC,
+            ..Default::default()
+        }
     );
 
     let merging_input = MergingInput{
@@ -100,6 +127,36 @@ async fn main() {
         SurfaceObject {pos: [1.0, 0.0], radius: 0.05, color: [0.8, 0.0, 0.0], object_type: 1, data: 0.08}, // red
     ];
 
+    // let object_texture = Texture::create_texture(
+    //     device,
+    // );
+
+    let ray_phantom = TextureBundle::create_texture(
+        device,
+        DIM,
+        DIM,
+        TextureProperties {
+            format: TextureFormat::Rgba8Unorm,
+            storage_texture: Some(StorageTextureAccess::WriteOnly),
+            is_sampled: false,
+            extra_usages: wgpu::TextureUsages::empty(),
+            ..Default::default()
+        }
+    );
+
+    let (display_texture, display_bundle) = TextureBundle::create_texture(
+        device,
+        DIM,
+        DIM,
+        TextureProperties {
+            format: TextureFormat::Rgba8Unorm,
+            storage_texture: None,
+            is_sampled: true,
+            extra_usages: wgpu::TextureUsages::empty(),
+            ..Default::default()
+        }
+    );
+
     scene! {
         scene: main_scene,
         active_camera: _,
@@ -112,10 +169,10 @@ async fn main() {
                     vertex_layouts: [DisplayVert::vertex_layout()],
                 },
                 attachments: [
-                    Texture(
-                        texture: Texture::create_texture(device, HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT, HIGHEST_PROBE_CNT * ANGULAR_COUNT_SQRT, TextureFormat::Rgba8Unorm, None, true, wgpu::TextureUsages::empty()),
+                    Texture (
+                        texture_bundle: display_bundle,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                    )
+                    ),
                 ],
                 // ident: "display",
             },
@@ -131,14 +188,44 @@ async fn main() {
                 )
             ]
         },
+        // "debug" = {
+        //     material: {
+        //         pipeline: {
+        //             fragment_shader_path: "",
+        //             vertex_shader_path: "",
+        //             uses_camera: false,
+        //             vertex_layouts: [DisplayVert::vertex_layout()],
+        //             geometry_details: {
+        //                 topology: wgpu::PrimitiveTopology::LineList,
+        //                 polygon_mode: wgpu::PolygonMode::Line,
+        //             }
+        //         },
+        //         attachments: [
+        //             Texture(
+        //                 texture: Texture::create_texture(device, DIM, DIM, TextureFormat::Rgba8Unorm, None, true, wgpu::TextureUsages::empty()),
+        //                 visibility: wgpu::ShaderStages::FRAGMENT,
+        //             )
+        //         ]
+        //     }
+        // },
         "probes" = {
             material: {
-                pipeline: {fragment_shader_path: "shaders/tempFrag.wgsl", vertex_shader_path: "shaders/tempVert.wgsl", uses_camera: false},
+                pipeline: {
+                    fragment_shader_path: "shaders/tempFrag.wgsl",
+                    vertex_shader_path: "shaders/tempVert.wgsl",
+                    uses_camera: false,
+                    // temp
+                    vertex_layouts: [DisplayVert::vertex_layout()],
+                    geometry_details: {
+                        topology: wgpu::PrimitiveTopology::LineList,
+                        polygon_mode: wgpu::PolygonMode::Line,
+                    },
+                },
                 ident: "ignore"
             },
             computes: [
                 Compute(
-                    input: vec![
+                    attachments: vec![
                         ShaderAttachment::Buffer(ShaderBufferAttachment::new(
                             device, bytemuck::cast_slice(&[cascade_input]), wgpu::BufferBindingType::Uniform, wgpu::ShaderStages::COMPUTE, wgpu::BufferUsages::empty()
                         )),
@@ -147,33 +234,51 @@ async fn main() {
                         )),
                         // fix this later
                         // order of 'output's follow order of textures passed in
-                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture.clone(), visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
-                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture2.clone(), visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
-                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3.clone(), visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture_bundle: cascade_texture_bundle.clone(), visibility: wgpu::ShaderStages::COMPUTE }),
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture_bundle: cascade_texture2_bundle.clone(), visibility: wgpu::ShaderStages::COMPUTE }),
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture_bundle: cascade_texture3_bundle.clone(), visibility: wgpu::ShaderStages::COMPUTE }),
+                        // ShaderAttachment::Buffer(ShaderBufferAttachment::new(
+                        //     device, bytemuck::cast_slice(&ray_phantom_data), wgpu::BufferBindingType::Storage { read_only: false }, wgpu::ShaderStages::COMPUTE, wgpu::BufferUsages::empty()
+                        // )),
                     ],
                     // output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3.clone(), visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     shader_path: "shaders/cascadeComputeCalculation.wgsl",
-                    workgroup_counts: (HIGHEST_PROBE_CNT, HIGHEST_PROBE_CNT, 3),
+                    workgroup_counts: v4::ecs::compute::WorkgroupCounts::Static(HIGHEST_PROBE_CNT, HIGHEST_PROBE_CNT, 3),
                     ident: "cascade_compute",
                 ),
                 Compute(
-                    input: vec![
+                    attachments: vec![
                         ShaderAttachment::Buffer(ShaderBufferAttachment::new(
                             device, bytemuck::cast_slice(&[merging_input]), wgpu::BufferBindingType::Storage { read_only: false }, wgpu::ShaderStages::COMPUTE, wgpu::BufferUsages::empty()
                         )),
-                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture_merge, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
-                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture2_merge, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
-                        ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3_merge, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture_bundle: cascade_texture_merge_bundle, visibility: wgpu::ShaderStages::COMPUTE }),
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture_bundle: cascade_texture2_merge_bundle, visibility: wgpu::ShaderStages::COMPUTE }),
+                        ShaderAttachment::Texture(ShaderTextureAttachment { texture_bundle: cascade_texture3_merge_bundle, visibility: wgpu::ShaderStages::COMPUTE }),
                     ],
                     // output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3_merge, visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     shader_path: "shaders/cascadeMergeCompute.wgsl",
                     iterate_count: 2,
-                    workgroup_counts: (HIGHEST_PROBE_CNT, HIGHEST_PROBE_CNT, 1),
+                    workgroup_counts: v4::ecs::compute::WorkgroupCounts::Static(HIGHEST_PROBE_CNT, HIGHEST_PROBE_CNT, 1),
                     ident: "cascade_merge",
                 )
             ],
             components: [
-                ComputeTextureTransferComponent(compute_id: ident("cascade_compute"), merge_id: ident("cascade_merge"), ignore_material: ident("ignore"), texture_slot: 0)
+                // probe visualization
+                // MeshComponent(
+                //     vertices: vec![
+                //         (0..DIM).map(|i| {
+                //             let x = (i % (DIM)) as f32 / (DIM) as f32;
+                //             let y = (i / (DIM)) as f32 / (DIM) as f32;
+                //             DisplayVert { pos: [x, y, 0.0], tex_coords: [0.0, 0.0] }
+                //         }).collect()
+                //     ],
+                //     enabled_models: vec![(0, None)],
+                // ),
+                ComputeTextureTransferComponent(
+                    compute_id: ident("cascade_compute"),
+                    merge_id: ident("cascade_merge"),
+                    ignore_material: ident("ignore"), texture_slot: 0
+                )
             ]
         }
     };
@@ -193,10 +298,10 @@ struct DisplayVert {
 impl VertexDescriptor for DisplayVert {
     const ATTRIBUTES: &[wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
 
-    fn from_pos_normal_coords(pos: Vec<f32>, _normal: Vec<f32>, tex_coords: Vec<f32>) -> Self {
+    fn from_data(data: VertexData) -> Self {
         Self {
-            pos: pos.try_into().unwrap(),
-            tex_coords: tex_coords.try_into().unwrap(),
+            pos: data.pos.try_into().unwrap(),
+            tex_coords: data.tex_coords.try_into().unwrap(),
         }
     }
 }
@@ -226,4 +331,10 @@ struct MergingInput {
     current_level: u32,
     l0_probe_count: u32,
     l0_angular_sample_count: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct ScreenSpaceInput {
+    dummy: u32,
 }

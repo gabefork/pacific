@@ -4,6 +4,7 @@
 @group(2) @binding(0) var output: texture_storage_2d<rgba8unorm, write>;
 @group(3) @binding(0) var output2: texture_storage_2d<rgba8unorm, write>;
 @group(4) @binding(0) var output3: texture_storage_2d<rgba8unorm, write>;
+@group(5) @binding(0) var ray_phantom: texture_storage_2d<rgba8unorm, write>; // testing
 
 const PI = 3.14159265;
 const NUM_OBJ: i32 = 3;

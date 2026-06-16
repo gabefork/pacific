@@ -56,16 +56,16 @@ impl ComponentSystem for ComputeTextureTransferComponent {
             return;
         }
         let material = material.unwrap();
-        let compute_output = compute.input_attachments();
+        let compute_output = compute.attachments();
         // if let Some(compute_output) = compute.input_attachments() {
-            let merge_input = merge.input_attachments();
+            let merge_input = merge.attachments();
             for i in 2..5_usize {
                 if let ShaderAttachment::Texture(comp_tex) = &compute_output[i] {
                     if let ShaderAttachment::Texture(merge_tex) = &merge_input[i - 1] {
                         encoder.copy_texture_to_texture(
-                            comp_tex.texture.texture().as_image_copy(),
-                            merge_tex.texture.texture().as_image_copy(),
-                            merge_tex.texture.texture().size(),
+                            comp_tex.texture_bundle.view().texture().as_image_copy(),
+                            merge_tex.texture_bundle.view().texture().as_image_copy(),
+                            merge_tex.texture_bundle.view().texture().size(),
                         );
                     }
                 }
@@ -75,9 +75,9 @@ impl ComponentSystem for ComputeTextureTransferComponent {
                     material.attachments().get(self.texture_slot)
                 {
                     encoder.copy_texture_to_texture(
-                        compute_tex.texture.texture().as_image_copy(),
-                        material_tex.texture.texture().as_image_copy(),
-                        compute_tex.texture.texture().size(),
+                        compute_tex.texture_bundle.view().texture().as_image_copy(),
+                        material_tex.texture_bundle.view().texture().as_image_copy(),
+                        compute_tex.texture_bundle.view().texture().size(),
                     );
                 }
             }
