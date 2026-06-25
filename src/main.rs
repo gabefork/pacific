@@ -1,10 +1,9 @@
 use v4::{
     V4, builtin_components::mesh_component::{MeshComponent, VertexData, VertexDescriptor}, ecs::{
-        compute::Compute,
-        material::{ShaderAttachment, ShaderBufferAttachment, ShaderTextureAttachment},
+        compute::Compute, material::{ShaderAttachment, ShaderBufferAttachment, ShaderTextureAttachment},
     }, engine_support::texture_support::{TextureBundle, TextureProperties}, scene
 };
-use wgpu::{StorageTextureAccess, TextureFormat, wgc::resource::TextureErrorDimension::Z};
+use wgpu::{StorageTextureAccess, TextureFormat};
 use winit::{
     dpi::PhysicalSize,
     window::WindowAttributes,
@@ -14,6 +13,15 @@ use nalgebra::vector;
 use compute_texture_transfer_component::{ComputeTextureTransferComponent};
 
 pub mod compute_texture_transfer_component;
+
+// debug macro, toggles debug code
+const DEBUG: bool = false;
+macro_rules! debug_only {
+    ($($code:tt)*) => {
+        if DEBUG
+        { $($code)*}
+    };
+}
 
 #[tokio::main]
 async fn main() {
@@ -129,23 +137,6 @@ async fn main() {
         SurfaceObject {pos: [1.0, 0.0], radius: 0.05, color: [0.8, 0.0, 0.0], object_type: 1, data: 0.08}, // red
     ];
 
-    // let object_texture = Texture::create_texture(
-    //     device,
-    // );
-
-    let (_, _ray_phantom_bundle) = TextureBundle::create_texture(
-        device,
-        DIM,
-        DIM,
-        TextureProperties {
-            format: TextureFormat::Rgba8Unorm,
-            storage_texture: Some(StorageTextureAccess::WriteOnly),
-            is_sampled: false,
-            extra_usages: wgpu::TextureUsages::empty(),
-            ..Default::default()
-        }
-    );
-
     let (_, display_bundle) = TextureBundle::create_texture(
         device,
         DIM,
@@ -190,7 +181,7 @@ async fn main() {
                 )
             ]
         },
-        "debug" = {
+        "debug" = { // debug lines for probe rays
             material: {
                 pipeline: {
                     fragment_shader_path: "shaders/debugFrag.wgsl",
@@ -206,44 +197,37 @@ async fn main() {
             },
             components: [
                 MeshComponent(
-                    vertices: vec![ (0..HIGHEST_PROBE_CNT/4).flat_map(|x| {
-                            (0..HIGHEST_PROBE_CNT/4).flat_map(move |y| {
-                                (0..3).flat_map(move |z| {
-                                    // actual angular sample count for this cascade level
-                                    let angular_sample_count = cascade_input.angular_sample_count << (2*z);
-                                    // let angular_sample_count_sqrt = (angular_sample_count as f32).sqrt() as u32;
-                                    
-                                    // normalized world position in [0,1] range
-                                    // let world_pos = vector![x as f32,y as f32] / HIGHEST_PROBE_CNT as f32;
-                                    let _probe_count = HIGHEST_PROBE_CNT/4 / u32::pow(2, 2 * z);
-                                    let probe_pos = vector![x as f32, y as f32] * 2.0 / _probe_count as f32 - vector![1.0, 1.0];
+                    vertices: if DEBUG { vec![
+                        (0..HIGHEST_PROBE_CNT/4).flat_map(|x| {
+                        (0..HIGHEST_PROBE_CNT/4).flat_map(move |y| {
+                        (0..3).flat_map(move |z| {
+                            // actual angular sample count for this cascade level
+                            let angular_sample_count = cascade_input.angular_sample_count << (2*z);
+                            println!("AAAAA");
+                            
+                            let _probe_count = HIGHEST_PROBE_CNT/4 / u32::pow(2, 2 * z);
+                            // normalize probe position to [-1, 1] range
+                            let probe_pos = vector![x as f32, y as f32] * 2.0 / _probe_count as f32 - vector![1.0, 1.0];
+                            fn interval_scale(cascade_level: u32) -> f32 {
+                                if cascade_level == 0 { return 0.0; }
+                                return (1 << (2 * cascade_level)) as f32;
+                            }
 
-                                    // prune threads
-                                    // if probe_pos.x > 1.0 || probe_pos.y > 1.0 { return vec![]; }
+                            (0..angular_sample_count).flat_map(move |i| {
+                                let interval = 0.5/4.0/HIGHEST_PROBE_CNT as f32 * vector![interval_scale(z), interval_scale(z+1)];
+                                let angle = (i as f32 / angular_sample_count as f32) * (2.0 * std::f32::consts::PI);
 
-                                    (0..angular_sample_count).flat_map(move |i| {
-                                        let interval = 0.5/4.0/HIGHEST_PROBE_CNT as f32 * vector![interval_scale(z), interval_scale(z+1)];
-                                        let angle = (i as f32 / angular_sample_count as f32 /*  + 1.0/8.0 */) * (2.0 * std::f32::consts::PI);
-                                        // let ray_radiance = cast_ray_in_direction(
-                                        //     probe_pos,
-                                        //     (i as f32 / angular_sample_count as f32 /*  + 1.0/8.0 */) * (2.0 * std::f32::consts::PI),
-                                        //     interval);
-                                        
-                                        // let pix_pos = angular_sample_count_sqrt * vector![x, y] + vector![i % angular_sample_count_sqrt, i / angular_sample_count_sqrt];
-                                        
-                                        let (s,c) = angle.sin_cos();
-                                        let ray_direction = vector![c, s];
-                                        let ray_origin = probe_pos + ray_direction * interval.x;
-                                        let ray_end = probe_pos + ray_direction * interval.y;
-                                        vec![
-                                            DebugVert { pos: [ray_origin.x, ray_origin.y, z as f32/3.0] },
-                                            DebugVert { pos: [ray_end.x, ray_end.y, z as f32/3.0] }
-                                        ]
-                                    }).collect::<Vec<_>>()
-                                }).collect::<Vec<_>>()
+                                let (s,c) = angle.sin_cos();
+                                let ray_direction = vector![c, s];
+                                let ray_origin = probe_pos + ray_direction * interval.x;
+                                let ray_end = probe_pos + ray_direction * interval.y;
+                                vec![
+                                    DebugVert { pos: [ray_origin.x, ray_origin.y, z as f32/3.0] },
+                                    DebugVert { pos: [ray_end.x, ray_end.y, z as f32/3.0] }
+                                ]
                             }).collect::<Vec<_>>()
-                        }).collect::<Vec<DebugVert>>()
-                        ],
+                        }).collect::<Vec<_>>()}).collect::<Vec<_>>()}).collect::<Vec<DebugVert>>()
+                    ]} else { vec![vec![DebugVert{ pos: [0.0;3] }]] },
                     enabled_models: vec![(0, None)],
                 )
             ]
@@ -277,9 +261,6 @@ async fn main() {
                         ShaderAttachment::Texture(ShaderTextureAttachment { texture_bundle: cascade_texture_bundle.clone(), visibility: wgpu::ShaderStages::COMPUTE }),
                         ShaderAttachment::Texture(ShaderTextureAttachment { texture_bundle: cascade_texture2_bundle.clone(), visibility: wgpu::ShaderStages::COMPUTE }),
                         ShaderAttachment::Texture(ShaderTextureAttachment { texture_bundle: cascade_texture3_bundle.clone(), visibility: wgpu::ShaderStages::COMPUTE }),
-                        // ShaderAttachment::Buffer(ShaderBufferAttachment::new(
-                        //     device, bytemuck::cast_slice(&ray_phantom_data), wgpu::BufferBindingType::Storage { read_only: false }, wgpu::ShaderStages::COMPUTE, wgpu::BufferUsages::empty()
-                        // )),
                     ],
                     // output: ShaderAttachment::Texture(ShaderTextureAttachment { texture: cascade_texture3.clone(), visibility: wgpu::ShaderStages::COMPUTE, extra_usages: wgpu::TextureUsages::empty() }),
                     shader_path: "shaders/cascadeComputeCalculation.wgsl",
@@ -303,24 +284,13 @@ async fn main() {
                 )
             ],
             components: [
-                // probe visualization
-                // MeshComponent(
-                //     vertices: vec![
-                //         (0..DIM).map(|i| {
-                //             let x = (i % (DIM)) as f32 / (DIM) as f32;
-                //             let y = (i / (DIM)) as f32 / (DIM) as f32;
-                //             DisplayVert { pos: [x, y, 0.0], tex_coords: [0.0, 0.0] }
-                //         }).collect()
-                //     ],
-                //     enabled_models: vec![(0, None)],
-                // ),
                 ComputeTextureTransferComponent(
                     compute_id: ident("cascade_compute"),
                     merge_id: ident("cascade_merge"),
                     ignore_material: ident("ignore"), texture_slot: 0
                 )
             ]
-        }
+        },
     };
 
     engine.attach_scene(main_scene);
@@ -328,11 +298,6 @@ async fn main() {
     engine.main_loop().await;
 }
 
-// scale marching interval based on cascade level
-fn interval_scale(cascade_level: u32) -> f32 {
-    if cascade_level == 0 { return 0.0; }
-    return (1 << (2 * cascade_level)) as f32;
-}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -352,6 +317,7 @@ impl VertexDescriptor for DisplayVert {
     }
 }
 
+/// vertices for drawing debug lines for probe rays
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct DebugVert {
@@ -377,6 +343,7 @@ struct CascadeInput {
     // cascade_levels: u32,
 }
 
+/// objects in the scene, either surfaces or light sources
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct SurfaceObject {
@@ -393,10 +360,4 @@ struct MergingInput {
     current_level: u32,
     l0_probe_count: u32,
     l0_angular_sample_count: u32,
-}
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct ScreenSpaceInput {
-    dummy: u32,
 }
