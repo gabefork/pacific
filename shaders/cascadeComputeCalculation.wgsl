@@ -1,9 +1,10 @@
 @group(0) @binding(0) var<uniform> input: CascadeInput;
-@group(1) @binding(0) var<uniform> obj_arr: array<SurfaceObject, 3u>;//NUM_OBJ>;
+@group(0) @binding(1) var<uniform> obj_arr: array<SurfaceObject, 3u>;//NUM_OBJ>;
 // number of outputs should be equal to id.z range ( = cascade levels)
-@group(2) @binding(0) var output: texture_storage_2d<rgba8unorm, write>;
-@group(3) @binding(0) var output2: texture_storage_2d<rgba8unorm, write>;
-@group(4) @binding(0) var output3: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(2) var output: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(3) var output2: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(4) var output3: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(5) var ray_phantom: texture_storage_2d<rgba8unorm, write>; // testing
 
 const PI = 3.14159265;
 const NUM_OBJ: i32 = 3;

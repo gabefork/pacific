@@ -1,5 +1,5 @@
 @group(0) @binding(0) var cascade: texture_2d<f32>;
-@group(1) @binding(0) var sample: sampler;
+@group(0) @binding(1) var sample: sampler;
 
 struct VertexOut {
     @builtin(position) clip_position: vec4<f32>,
@@ -21,7 +21,7 @@ struct Ray {
 }
 
 const LINEAR_PROBE_COUNT = 128u;
-const RADIAL_SAMPLE_COUNT_SQRT = 8u;
+const RADIAL_SAMPLE_COUNT_SQRT = 16u;
 
 @fragment
 fn main(in: VertexOut) -> @location(0) vec4f { 

@@ -1,8 +1,8 @@
 @group(0) @binding(0) var<storage, read_write> input: MergeInput;
 // number of outputs should be equal to id.z range ( = cascade levels)
-@group(1) @binding(0) var output: texture_storage_2d<rgba8unorm, read_write>;
-@group(2) @binding(0) var output2: texture_storage_2d<rgba8unorm, read_write>;
-@group(3) @binding(0) var output3: texture_storage_2d<rgba8unorm, read_write>;
+@group(0) @binding(1) var output: texture_storage_2d<rgba8unorm, read_write>;
+@group(0) @binding(2) var output2: texture_storage_2d<rgba8unorm, read_write>;
+@group(0) @binding(3) var output3: texture_storage_2d<rgba8unorm, read_write>;
 
 struct MergeInput {
     layer: u32,
