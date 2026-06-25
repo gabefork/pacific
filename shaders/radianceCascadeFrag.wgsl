@@ -21,7 +21,7 @@ struct Ray {
 }
 
 const LINEAR_PROBE_COUNT = 128u;
-const RADIAL_SAMPLE_COUNT_SQRT = 8u;
+const RADIAL_SAMPLE_COUNT_SQRT = 16u;
 
 @fragment
 fn main(in: VertexOut) -> @location(0) vec4f { 

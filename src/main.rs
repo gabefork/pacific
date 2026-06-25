@@ -4,11 +4,12 @@ use v4::{
         material::{ShaderAttachment, ShaderBufferAttachment, ShaderTextureAttachment},
     }, engine_support::texture_support::{TextureBundle, TextureProperties}, scene
 };
-use wgpu::{StorageTextureAccess, TextureFormat};
+use wgpu::{StorageTextureAccess, TextureFormat, wgc::resource::TextureErrorDimension::Z};
 use winit::{
     dpi::PhysicalSize,
     window::WindowAttributes,
 };
+use nalgebra::vector;
 
 use compute_texture_transfer_component::{ComputeTextureTransferComponent};
 
@@ -30,6 +31,7 @@ async fn main() {
     let rendering_manager = engine.rendering_manager();
     let device = rendering_manager.device();
 
+    // remember to match these values in shaders/radianceCascadeFrag.wgsl
     // actually square root of probe count
     const HIGHEST_PROBE_CNT: u32 = 128;
     const ANGULAR_COUNT_SQRT: u32 = 16;
@@ -40,7 +42,7 @@ async fn main() {
         // distance_between_probes: 4.0,
         // cascade_levels: 2,
     };
-    let (cascade_texture, cascade_texture_bundle) = TextureBundle::create_texture(
+    let (_, cascade_texture_bundle) = TextureBundle::create_texture(
         device,
         DIM,
         DIM,
@@ -52,7 +54,7 @@ async fn main() {
             ..Default::default()
         }
     );
-    let (cascade_texture2, cascade_texture2_bundle) = TextureBundle::create_texture(
+    let (_, cascade_texture2_bundle) = TextureBundle::create_texture(
         device,
         DIM / 2,
         DIM / 2,
@@ -64,7 +66,7 @@ async fn main() {
             ..Default::default()
         }
     );
-    let (cascade_texture3, cascade_texture3_bundle) = TextureBundle::create_texture(
+    let (_, cascade_texture3_bundle) = TextureBundle::create_texture(
         device,
         DIM / 4,
         DIM / 4,
@@ -77,7 +79,7 @@ async fn main() {
         }
     );
 
-    let (cascade_texture_merge, cascade_texture_merge_bundle) = TextureBundle::create_texture(
+    let (_, cascade_texture_merge_bundle) = TextureBundle::create_texture(
         device,
         DIM,
         DIM,
@@ -89,7 +91,7 @@ async fn main() {
             ..Default::default()
         }
     );
-    let (cascade_texture2_merge, cascade_texture2_merge_bundle) = TextureBundle::create_texture(
+    let (_, cascade_texture2_merge_bundle) = TextureBundle::create_texture(
         device,
         DIM / 2,
         DIM / 2,
@@ -101,7 +103,7 @@ async fn main() {
             ..Default::default()
         }
     );
-    let (cascade_texture3_merge, cascade_texture3_merge_bundle) = TextureBundle::create_texture(
+    let (_, cascade_texture3_merge_bundle) = TextureBundle::create_texture(
         device,
         DIM / 4,
         DIM / 4,
@@ -131,7 +133,7 @@ async fn main() {
     //     device,
     // );
 
-    let ray_phantom = TextureBundle::create_texture(
+    let (_, _ray_phantom_bundle) = TextureBundle::create_texture(
         device,
         DIM,
         DIM,
@@ -144,7 +146,7 @@ async fn main() {
         }
     );
 
-    let (display_texture, display_bundle) = TextureBundle::create_texture(
+    let (_, display_bundle) = TextureBundle::create_texture(
         device,
         DIM,
         DIM,
@@ -179,35 +181,73 @@ async fn main() {
             components: [
                 MeshComponent(
                     vertices: vec![vec![
-                            DisplayVert {pos: [-1.0, 3.0, 0.0], tex_coords: [0.0, 2.0]},
-                            DisplayVert {pos: [-1.0, -1.0, 0.0], tex_coords: [0.0, 0.0]},
-                            DisplayVert {pos: [3.0, -1.0, 0.0], tex_coords: [2.0, 0.0]},
+                            DisplayVert {pos: [-1.0, 3.0, 1.0], tex_coords: [0.0, 2.0]},
+                            DisplayVert {pos: [-1.0, -1.0, 1.0], tex_coords: [0.0, 0.0]},
+                            DisplayVert {pos: [3.0, -1.0, 1.0], tex_coords: [2.0, 0.0]},
                         ]],
                     indices: vec![vec![0, 1, 2]],
                     enabled_models: vec![(0, None)],
                 )
             ]
         },
-        // "debug" = {
-        //     material: {
-        //         pipeline: {
-        //             fragment_shader_path: "",
-        //             vertex_shader_path: "",
-        //             uses_camera: false,
-        //             vertex_layouts: [DisplayVert::vertex_layout()],
-        //             geometry_details: {
-        //                 topology: wgpu::PrimitiveTopology::LineList,
-        //                 polygon_mode: wgpu::PolygonMode::Line,
-        //             }
-        //         },
-        //         attachments: [
-        //             Texture(
-        //                 texture: Texture::create_texture(device, DIM, DIM, TextureFormat::Rgba8Unorm, None, true, wgpu::TextureUsages::empty()),
-        //                 visibility: wgpu::ShaderStages::FRAGMENT,
-        //             )
-        //         ]
-        //     }
-        // },
+        "debug" = {
+            material: {
+                pipeline: {
+                    fragment_shader_path: "shaders/debugFrag.wgsl",
+                    vertex_shader_path: "shaders/debugVert.wgsl",
+                    uses_camera: false,
+                    vertex_layouts: [DebugVert::vertex_layout()],
+                    geometry_details: {
+                        topology: wgpu::PrimitiveTopology::LineList,
+                        cull_mode: None,
+                        polygon_mode: wgpu::PolygonMode::Fill,
+                    }
+                },
+            },
+            components: [
+                MeshComponent(
+                    vertices: vec![ (0..HIGHEST_PROBE_CNT/4).flat_map(|x| {
+                            (0..HIGHEST_PROBE_CNT/4).flat_map(move |y| {
+                                (0..3).flat_map(move |z| {
+                                    // actual angular sample count for this cascade level
+                                    let angular_sample_count = cascade_input.angular_sample_count << (2*z);
+                                    // let angular_sample_count_sqrt = (angular_sample_count as f32).sqrt() as u32;
+                                    
+                                    // normalized world position in [0,1] range
+                                    // let world_pos = vector![x as f32,y as f32] / HIGHEST_PROBE_CNT as f32;
+                                    let _probe_count = HIGHEST_PROBE_CNT/4 / u32::pow(2, 2 * z);
+                                    let probe_pos = vector![x as f32, y as f32] * 2.0 / _probe_count as f32 - vector![1.0, 1.0];
+
+                                    // prune threads
+                                    // if probe_pos.x > 1.0 || probe_pos.y > 1.0 { return vec![]; }
+
+                                    (0..angular_sample_count).flat_map(move |i| {
+                                        let interval = 0.5/4.0/HIGHEST_PROBE_CNT as f32 * vector![interval_scale(z), interval_scale(z+1)];
+                                        let angle = (i as f32 / angular_sample_count as f32 /*  + 1.0/8.0 */) * (2.0 * std::f32::consts::PI);
+                                        // let ray_radiance = cast_ray_in_direction(
+                                        //     probe_pos,
+                                        //     (i as f32 / angular_sample_count as f32 /*  + 1.0/8.0 */) * (2.0 * std::f32::consts::PI),
+                                        //     interval);
+                                        
+                                        // let pix_pos = angular_sample_count_sqrt * vector![x, y] + vector![i % angular_sample_count_sqrt, i / angular_sample_count_sqrt];
+                                        
+                                        let (s,c) = angle.sin_cos();
+                                        let ray_direction = vector![c, s];
+                                        let ray_origin = probe_pos + ray_direction * interval.x;
+                                        let ray_end = probe_pos + ray_direction * interval.y;
+                                        vec![
+                                            DebugVert { pos: [ray_origin.x, ray_origin.y, z as f32/3.0] },
+                                            DebugVert { pos: [ray_end.x, ray_end.y, z as f32/3.0] }
+                                        ]
+                                    }).collect::<Vec<_>>()
+                                }).collect::<Vec<_>>()
+                            }).collect::<Vec<_>>()
+                        }).collect::<Vec<DebugVert>>()
+                        ],
+                    enabled_models: vec![(0, None)],
+                )
+            ]
+        },
         "probes" = {
             material: {
                 pipeline: {
@@ -288,6 +328,12 @@ async fn main() {
     engine.main_loop().await;
 }
 
+// scale marching interval based on cascade level
+fn interval_scale(cascade_level: u32) -> f32 {
+    if cascade_level == 0 { return 0.0; }
+    return (1 << (2 * cascade_level)) as f32;
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct DisplayVert {
@@ -302,6 +348,22 @@ impl VertexDescriptor for DisplayVert {
         Self {
             pos: data.pos.try_into().unwrap(),
             tex_coords: data.tex_coords.try_into().unwrap(),
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct DebugVert {
+    pos: [f32; 3],
+}
+
+impl VertexDescriptor for DebugVert {
+    const ATTRIBUTES: &[wgpu::VertexAttribute] = &wgpu::vertex_attr_array![0 => Float32x3,];
+
+    fn from_data(data: VertexData) -> Self {
+        Self {
+            pos: data.pos.try_into().unwrap(),
         }
     }
 }
